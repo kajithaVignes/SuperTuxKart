@@ -33,7 +33,7 @@ if __name__ == "__main__":
     print("Act space:", env.action_space)
     # actor = Actor(env.observation_space, env.action_space)
     policy_kwargs = dict(
-    net_arch=[256, 256],  
+    net_arch=[256, 256],  # exactement comme ton BCModel
     activation_fn=torch.nn.ReLU,
     )
 
