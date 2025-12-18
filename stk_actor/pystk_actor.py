@@ -1,23 +1,32 @@
 from typing import List, Callable
 from bbrl.agents import Agents, Agent
 import gymnasium as gym
-
+import torch
+import pystk2_gymnasium
 # Imports our Actor class
 # IMPORTANT: note the relative import
-from .actors import Actor, MyWrapper, ArgmaxActor, SamplingActor, SB3ActorContinue,ContinuousObs,RewardLogger,DrivingObsWrapper,ContinuousActionWrapper
+from .actors import MyWrapper, SamplingActor,RewardLogger, basicdrivingAct, basicdrivingObs, OnlyContinuousActionsWrapper, SACInferenceActor
 
 #: The base environment name (you can change that)
-env_name = "supertuxkart/full-v0"
+env_name = "supertuxkart/full-v0" 
 
 #: Player name (you must change that)
 player_name = "Cailloux"
 
 
 def get_wrappers() -> List[Callable[[gym.Env], gym.Wrapper]]:
+    """Returns a list of additional wrappers to be applied to the base
+    environment"""
     return [
-        lambda env: DrivingObsWrapper(env),
-        lambda env: ContinuousActionWrapper(env),
-        lambda env: RewardLogger(env),
+        # Example of a custom wrapper
+        lambda env: MyWrapper(env, option="1"),
+        # lambda env: basicdrivingObs(env),
+        # lambda env: basicdrivingAct(env),
+        # lambda env: RewardLogger(env),
+        lambda env: pystk2_gymnasium.ConstantSizedObservations(env, state_items=5, state_karts=5, state_paths=5),
+        lambda env: pystk2_gymnasium.PolarObservations(env),
+        lambda env: OnlyContinuousActionsWrapper(env),
+        lambda env: pystk2_gymnasium.FlattenerWrapper(env)
     ]
 
 
@@ -33,12 +42,15 @@ def get_actor(
     :param action_space: The environment action space (with wrappers)
     :return: a BBRL agent
     """
-    actor = Actor(observation_space, action_space)
+
 
     # Returns a dummy actor
-    #if state is None:
-        #return SamplingActor(action_space)
+    if state is None:
+        return SamplingActor(action_space)
 
-     #actor.load_state_dict(state)
-    #return Agents(actor, ArgmaxActor())
-    return SB3ActorContinue(observation_space, action_space, state)
+    return SACInferenceActor(
+        observation_space=observation_space,
+        action_space=action_space,
+        actor_state=state
+    )
+   
