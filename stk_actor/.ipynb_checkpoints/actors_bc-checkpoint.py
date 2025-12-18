@@ -27,7 +27,6 @@ def extract_driving_obs(obs):
     o.append(np.array([obs["distance_down_track"]]).reshape(-1))
     o.append(np.array([obs["center_path_distance"]]).reshape(-1))
     o.append(np.array([obs["max_steer_angle"]]).reshape(-1))
-    o.append(np.array([float(obs["jumping"])]).reshape(-1))
 
     K = 5
     paths_start = pad_paths(obs["paths_start"], K, 2).flatten()
@@ -37,6 +36,7 @@ def extract_driving_obs(obs):
     o.extend([paths_start, paths_end, paths_width])
 
     return np.concatenate(o)
+
 
 
 def extract_continuous_action(action):
@@ -174,7 +174,7 @@ class DrivingObsWrapper(gym.ObservationWrapper):
         return extract_driving_obs(obs).shape[0]
 
     def observation(self, obs):
-        return extract_driving_obs(obs)
+        return {"continuous": extract_driving_obs(obs).astype(np.float32)}
 
 
 class ContinuousActionWrapper(gym.ActionWrapper):
