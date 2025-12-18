@@ -18,6 +18,7 @@ def get_wrappers() -> List[Callable[[gym.Env], gym.Wrapper]]:
     """Returns a list of additional wrappers to be applied to the base
     environment"""
     return [
+<<<<<<< HEAD
         # Example of a custom wrapper
         lambda env: MyWrapper(env, option="1"),
         # lambda env: basicdrivingObs(env),
@@ -27,6 +28,10 @@ def get_wrappers() -> List[Callable[[gym.Env], gym.Wrapper]]:
         lambda env: pystk2_gymnasium.PolarObservations(env),
         lambda env: OnlyContinuousActionsWrapper(env),
         lambda env: pystk2_gymnasium.FlattenerWrapper(env)
+=======
+        lambda env: DrivingObsWrapper(env),
+        lambda env: ContinuousActionWrapper(env)
+>>>>>>> 59f7bb027710f83ba6f0fc772330ff3319277e6a
     ]
 
 
