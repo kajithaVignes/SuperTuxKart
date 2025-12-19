@@ -13,7 +13,6 @@ from pystk2_gymnasium import AgentSpec
 from bbrl.agents.gymnasium import ParallelGymAgent, make_env
 
 from .pystk_actor import env_name, get_wrappers, player_name
-from .actors import ContinuousObs
 
 
 if __name__ == "__main__":
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     print("Act space:", env.action_space)
     # actor = Actor(env.observation_space, env.action_space)
     policy_kwargs = dict(
-    net_arch=[256, 256],  # exactement comme ton BCModel
+    net_arch=[256, 256],  
     activation_fn=torch.nn.ReLU,
     )
 
@@ -61,7 +60,7 @@ if __name__ == "__main__":
     print("policy initial depuis BC")
 
     model.learn(
-        total_timesteps=50_000,
+        total_timesteps=500_000,
         tb_log_name="sac_reward_bc_init",
     )
     

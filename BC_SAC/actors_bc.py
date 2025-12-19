@@ -1,11 +1,15 @@
 import gymnasium as gym
 from bbrl.agents import Agent
 import torch
+import torch.nn as nn
 import numpy as np
 from gymnasium.spaces import Box, Discrete
 from gymnasium import ActionWrapper, ObservationWrapper, RewardWrapper, Wrapper
 from stable_baselines3.sac.policies import MlpPolicy
 
+
+OBS_DIM = 47
+ACTION_DIM = 1
 def flatten_sequence(seq):
     return np.concatenate([np.asarray(x).reshape(-1) for x in seq], axis=0)
 
@@ -16,7 +20,8 @@ def pad_paths(seq, K, dim):
         pad = np.zeros((K - len(seq), dim), dtype=np.float32)
         seq = np.vstack([seq, pad])
     return seq[:K] 
-    
+
+#on enleve jump
 def extract_driving_obs(obs):
     o = []
 
@@ -38,11 +43,9 @@ def extract_driving_obs(obs):
     return np.concatenate(o)
 
 
-
 def extract_continuous_action(action):
     return np.array([
         action["steer"][0],
-        action["acceleration"][0],
     ], dtype=np.float32)
 
 
@@ -55,6 +58,7 @@ class MyWrapper(gym.ActionWrapper):
         # We do nothing here
         return action
 
+'''
 class ContinuousObs(ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -73,41 +77,7 @@ class ContinuousObs(ObservationWrapper):
         if isinstance(obs, dict) and 'continuous' in obs:
             return obs['continuous']
         return obs
-'''       
-
-#classe pour visualizer les reward pour mieux comprendre ce qui s epasse et eventuellement le modifier
-
-class RewardLogger(gym.Wrapper):
-
-    def __init__(self, env):
-        super().__init__(env)
-        self.i = 0 
-        
-    def reset(self, **kwargs):
-        self.finished = False
-        return self.env.reset(**kwargs)
-        
-    def step(self, action):
-        obs, reward, done, truncated, info = self.env.step(action)
-        # You now see the reward
-        if self.i%10000==0:
-            print("Step reward:", reward)
-            print("Infos:", info)
-            print("done:", done)
-            print("truncated:", truncated)
-            print("observation:", obs)
-            print("action:", action)
-        if done or truncated:
-            print("Step reward:", reward)
-            print("Infos:", info)
-            print("done:", done)
-            print("truncated:", truncated)
-            print("observation:", obs)
-            print("action:", action)
-        return obs, reward, done, truncated, info
-
 '''
-
 
 class RewardLogger(gym.Wrapper):
     
@@ -164,7 +134,7 @@ class DrivingObsWrapper(gym.ObservationWrapper):
         self.observation_space = Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self._obs_dim(),),
+            shape=(OBS_DIM,),
             dtype=np.float32
         )
 
@@ -174,18 +144,28 @@ class DrivingObsWrapper(gym.ObservationWrapper):
         return extract_driving_obs(obs).shape[0]
 
     def observation(self, obs):
-        return {"continuous": extract_driving_obs(obs).astype(np.float32)}
+        
+        obs_vec = extract_driving_obs(obs)
+        return  obs_vec
+        
+        #return {
+         #  "continuous": extract_driving_obs(obs).astype(np.float32)
+        #}
+        
 
+            
 
 class ContinuousActionWrapper(gym.ActionWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.action_space = Box(-1.0, 1.0, shape=(2,), dtype=np.float32)
+        # On ne garde que le steer
+        self.action_space = Box(-1.0, 1.0, shape=(1,), dtype=np.float32)
 
     def action(self, action):
+        # On ne met que steer dans le dictionnaire d'action
         return {
             "steer": np.array([action[0]], dtype=np.float32),
-            "acceleration": np.array([action[1]], dtype=np.float32),
+            "acceleration": np.array([1.0], dtype=np.float32),  # fixe une valeur si nécessaire
             "brake": 0,
             "drift": 0,
             "fire": 0,
@@ -220,25 +200,74 @@ class SamplingActor(Agent):
         self.set(("action", t), torch.LongTensor([self.action_space.sample()]))
 
 
+
+class CleanNetwork(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(OBS_DIM, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+        )
+        self.mu = nn.Linear(256, ACTION_DIM)
+
+    def forward(self, x):
+        return torch.tanh(self.mu(self.net(x)))
+
+
+class CleanBBRLActor(Agent):
+    def __init__(self):
+        super().__init__()
+        self.model = CleanNetwork()
+        self.model.eval()
+
+    def forward(self, t: int):
+        obs = self.get(("env/env_obs/continuous", t))
+
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype=torch.float32)
+
+        with torch.no_grad():
+            action = self.model(obs).cpu().numpy()
+
+        action_dict = {
+            "steer": np.array([action[0]], dtype=np.float32),
+            "acceleration": np.array([1.0], dtype=np.float32),
+            "brake": 0,
+            "drift": 0,
+            "fire": 0,
+            "nitro": 0,
+            "rescue": 0,
+        }
+
+        self.set(("action", t), action_dict)
+
 class SB3ActorContinue(Agent):
     def __init__(self, observation_space, action_space, state):
         super().__init__()
-        new_obs_space = observation_space['continuous']
+
         self.policy = MlpPolicy(
-            observation_space=new_obs_space,
+            observation_space=observation_space,
             action_space=action_space,
             lr_schedule=lambda _: 0.0,
         )
 
         if state is not None:
             self.policy.load_state_dict(state)
-        
+
         self.policy.eval()
 
     def forward(self, t: int):
-        obs_continuous = self.get(("env/env_obs/continuous", t))
-        
-        obs_tensor, _ = self.policy.obs_to_tensor(obs_continuous)
-        action = self.policy.actor(obs_tensor, deterministic=True)
+        obs = self.get(("env/env_obs", t))
 
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype=torch.float32)
+
+        obs_tensor, _ = self.policy.obs_to_tensor(obs)
+
+        with torch.no_grad():
+            action = self.policy.actor(obs_tensor, deterministic=True)
+
+        # action est déjà correct (Box(1,))
         self.set(("action", t), action)

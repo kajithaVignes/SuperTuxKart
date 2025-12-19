@@ -12,8 +12,8 @@ import numpy as np
 from pystk2_gymnasium import AgentSpec
 from bbrl.agents.gymnasium import ParallelGymAgent, make_env
 
-from .pystk_actor import env_name, get_wrappers, player_name
-from .actors import ContinuousObs,extract_driving_obs,extract_continuous_action
+from pystk_actor import env_name, get_wrappers, player_name
+from actors import extract_driving_obs,extract_continuous_action
 from pystk2_gymnasium import ConstantSizedObservations
 
 N_PATHS = 5
@@ -27,8 +27,8 @@ if __name__=="__main__":
     )
 
     env = ConstantSizedObservations(env, state_paths=5)
-    print("Obs space:", env.observation_space)
-    print("Act space:", env.action_space)
+    print("Obs space:", env.observation_space.shape)
+    print("Act space:", env.action_space.shape)
     observations = []
     actions = []
     
@@ -44,6 +44,8 @@ if __name__=="__main__":
         obs_vec = extract_driving_obs(obs)
         act_vec = extract_continuous_action(obs["action"])
         #print(act_vec)
+        #print("Obs shape:", obs_vec.shape)
+        #print("Obs vector:", obs_vec)
 
         observations.append(obs_vec)
         actions.append(act_vec) 

@@ -121,23 +121,6 @@ class OnlyContinuousActionsWrapper(gym.ActionWrapper):
             }
         )
 
-<<<<<<< HEAD
-=======
-    def _obs_dim(self):
-        # calcule une fois à partir d'un reset
-        obs, _ = self.env.reset()
-        return extract_driving_obs(obs).shape[0]
-
-    def observation(self, obs):
-        return {"continuous": extract_driving_obs(obs).astype(np.float32)}
-
-
-class ContinuousActionWrapper(gym.ActionWrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        self.action_space = Box(-1.0, 1.0, shape=(2,), dtype=np.float32)
-
->>>>>>> 59f7bb027710f83ba6f0fc772330ff3319277e6a
     def action(self, action):
        
         full_action = {**action}
