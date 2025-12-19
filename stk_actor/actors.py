@@ -5,7 +5,6 @@ import torch.nn as nn
 import numpy as np
 from gymnasium.spaces import Box, Discrete
 from gymnasium import ActionWrapper, ObservationWrapper, RewardWrapper, Wrapper
-from stable_baselines3.sac.policies import MlpPolicy
 
 
 OBS_DIM = 47
@@ -200,74 +199,46 @@ class SamplingActor(Agent):
         self.set(("action", t), torch.LongTensor([self.action_space.sample()]))
 
 
-
-class CleanNetwork(nn.Module):
-    def __init__(self):
+class SubmissionActor(Agent):
+    def __init__(self, state):
         super().__init__()
-        self.net = nn.Sequential(
+
+        self.model = nn.Sequential(
             nn.Linear(OBS_DIM, 256),
             nn.ReLU(),
             nn.Linear(256, 256),
             nn.ReLU(),
-        )
-        self.mu = nn.Linear(256, ACTION_DIM)
-
-    def forward(self, x):
-        return torch.tanh(self.mu(self.net(x)))
-
-
-class CleanBBRLActor(Agent):
-    def __init__(self):
-        super().__init__()
-        self.model = CleanNetwork()
-        self.model.eval()
-
-    def forward(self, t: int):
-        obs = self.get(("env/env_obs/continuous", t))
-
-        if not isinstance(obs, torch.Tensor):
-            obs = torch.tensor(obs, dtype=torch.float32)
-
-        with torch.no_grad():
-            action = self.model(obs).cpu().numpy()
-
-        action_dict = {
-            "steer": np.array([action[0]], dtype=np.float32),
-            "acceleration": np.array([1.0], dtype=np.float32),
-            "brake": 0,
-            "drift": 0,
-            "fire": 0,
-            "nitro": 0,
-            "rescue": 0,
-        }
-
-        self.set(("action", t), action_dict)
-
-class SB3ActorContinue(Agent):
-    def __init__(self, observation_space, action_space, state):
-        super().__init__()
-
-        self.policy = MlpPolicy(
-            observation_space=observation_space,
-            action_space=action_space,
-            lr_schedule=lambda _: 0.0,
+            nn.Linear(256, ACTION_DIM),
+            nn.Tanh()
         )
 
         if state is not None:
-            self.policy.load_state_dict(state)
+            actor_state = {}
 
-        self.policy.eval()
+            # mapping SB3 → Sequential
+            actor_state["0.weight"] = state["actor.latent_pi.0.weight"]
+            actor_state["0.bias"]   = state["actor.latent_pi.0.bias"]
+
+            actor_state["2.weight"] = state["actor.latent_pi.2.weight"]
+            actor_state["2.bias"]   = state["actor.latent_pi.2.bias"]
+
+            actor_state["4.weight"] = state["actor.mu.weight"]
+            actor_state["4.bias"]   = state["actor.mu.bias"]
+
+            self.model.load_state_dict(actor_state)
+
+        self.model.eval()
 
     def forward(self, t: int):
         obs = self.get(("env/env_obs", t))
 
+        if isinstance(obs, dict):
+            obs = extract_driving_obs(obs)
+    
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype=torch.float32)
-
-        obs_tensor, _ = self.policy.obs_to_tensor(obs)
-
+    
         with torch.no_grad():
-            action = self.policy.actor(obs_tensor, deterministic=True)
-
-        # action est déjà correct (Box(1,))
+            action = self.model(obs)
+    
         self.set(("action", t), action)

@@ -5,7 +5,6 @@ import torch.nn as nn
 import numpy as np
 from gymnasium.spaces import Box, Discrete
 from gymnasium import ActionWrapper, ObservationWrapper, RewardWrapper, Wrapper
-from stable_baselines3.sac.policies import MlpPolicy
 
 
 OBS_DIM = 47
@@ -270,4 +269,49 @@ class SB3ActorContinue(Agent):
             action = self.policy.actor(obs_tensor, deterministic=True)
 
         # action est déjà correct (Box(1,))
+        self.set(("action", t), action)
+
+
+class SubmissionActor(Agent):
+    def __init__(self, state):
+        super().__init__()
+
+        self.model = nn.Sequential(
+            nn.Linear(OBS_DIM, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, ACTION_DIM),
+            nn.Tanh()
+        )
+
+        if state is not None:
+            actor_state = {}
+
+            # mapping SB3 → Sequential
+            actor_state["0.weight"] = state["actor.latent_pi.0.weight"]
+            actor_state["0.bias"]   = state["actor.latent_pi.0.bias"]
+
+            actor_state["2.weight"] = state["actor.latent_pi.2.weight"]
+            actor_state["2.bias"]   = state["actor.latent_pi.2.bias"]
+
+            actor_state["4.weight"] = state["actor.mu.weight"]
+            actor_state["4.bias"]   = state["actor.mu.bias"]
+
+            self.model.load_state_dict(actor_state)
+
+        self.model.eval()
+
+    def forward(self, t: int):
+        obs = self.get(("env/env_obs", t))
+
+        if isinstance(obs, dict):
+            obs = extract_driving_obs(obs)
+    
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype=torch.float32)
+    
+        with torch.no_grad():
+            action = self.model(obs)
+    
         self.set(("action", t), action)
