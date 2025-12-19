@@ -13,7 +13,6 @@ from pystk2_gymnasium import AgentSpec
 from bbrl.agents.gymnasium import ParallelGymAgent, make_env
 
 from .pystk_actor import env_name, get_wrappers, player_name
-from .actors import ContinuousObs
 
 
 if __name__ == "__main__":
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     print("Act space:", env.action_space)
     # actor = Actor(env.observation_space, env.action_space)
     policy_kwargs = dict(
-    net_arch=[256, 256],  # exactement comme ton BCModel
+    net_arch=[256, 256],  
     activation_fn=torch.nn.ReLU,
     )
 
@@ -42,31 +41,17 @@ if __name__ == "__main__":
         env,
         policy_kwargs=policy_kwargs,
         verbose=1,
-        tensorboard_log="./tb_logs/sac_bc"
+        tensorboard_log="./tb_logs/sac_alea"
     )
     
-    
-    bc_path = Path("./stk_actor/bc_model.pth")
-    bc_state = torch.load(bc_path, map_location="cpu")
-
-    sac_actor = model.policy.actor
-
-    with torch.no_grad():
-        for sac_param, bc_param in zip(
-            sac_actor.parameters(),
-            bc_state.values(),
-        ):
-            sac_param.copy_(bc_param)
-
-    print("policy initial depuis BC")
 
     model.learn(
-        total_timesteps=50_000,
-        tb_log_name="sac_reward_bc_init",
+        total_timesteps=500_000,
+        tb_log_name="sac_reward_alea_init",
     )
     
     mod_path = Path(inspect.getfile(get_wrappers)).parent
-    torch.save(model.policy.state_dict(), mod_path / "pystk_actor.pth")
+    torch.save(model.policy.state_dict(), mod_path / "pystk_actor_alea.pth")
     print("politique optimale")
     env.close()
 
