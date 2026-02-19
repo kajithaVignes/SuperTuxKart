@@ -5,7 +5,7 @@ import inspect
 import torch
 import gymnasium as gym
 import pystk2_gymnasium  # IMPORTANT
-from stable_baselines3 import SAC
+from stable_baselines3 import PPO
 from gymnasium.wrappers import FlattenObservation
 import numpy as np
 
@@ -36,19 +36,19 @@ if __name__ == "__main__":
     activation_fn=torch.nn.ReLU,
     )
 
-    model = SAC(
+    model = PPO(
         "MlpPolicy",
         env,
         policy_kwargs=policy_kwargs,
         verbose=1,
-        tensorboard_log="./tb_logs/sac_bc"
+        tensorboard_log="./tb_logs/ppo_bc"
     )
     
     
     bc_path = Path("./stk_actor/bc_model.pth")
     bc_state = torch.load(bc_path, map_location="cpu")
 
-    sac_actor = model.policy.actor
+    sac_actor = model.policy
 
     with torch.no_grad():
         for sac_param, bc_param in zip(
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
     model.learn(
         total_timesteps=500_000,
-        tb_log_name="sac_reward_bc_init",
+        tb_log_name="ppo_reward_bc_init",
     )
     
     mod_path = Path(inspect.getfile(get_wrappers)).parent
-    torch.save(model.policy.state_dict(), mod_path / "pystk_actor.pth")
+    torch.save(model.policy.state_dict(), mod_path / "pystk_actor_ppo_bc.pth")
     print("politique optimale")
     env.close()
 
