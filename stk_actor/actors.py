@@ -48,36 +48,6 @@ def extract_continuous_action(action):
     ], dtype=np.float32)
 
 
-class MyWrapper(gym.ActionWrapper):
-    def __init__(self, env, option: int):
-        super().__init__(env)
-        self.option = option
-
-    def action(self, action):
-        # We do nothing here
-        return action
-
-'''
-class ContinuousObs(ObservationWrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        if isinstance(env.observation_space, gym.spaces.Dict):
-            continu_space = env.observation_space['continuous']
-            self.observation_space = Box(
-                low=continu_space.low,
-                high=continu_space.high,
-                dtype=continu_space.dtype
-            )
-        else:
-            self.observation_space = env.observation_space
-
-
-    def observation(self, obs):
-        if isinstance(obs, dict) and 'continuous' in obs:
-            return obs['continuous']
-        return obs
-'''
-
 class RewardLogger(gym.Wrapper):
     
     def __init__(self, env):
@@ -106,21 +76,6 @@ class RewardLogger(gym.Wrapper):
         new_reward = self.custom_reward(current_distance, self.prev_distance, reward, f_t)
         
         self.i += 1
-        # if self.i % 1== self.i:
-        #     print("--- Step Log ---")
-        #     print(f"Step: {self.i}")
-        #     print("Old distance: ",current_distance,"\t new distance: ",self.prev_distance)
-        #     print(f"Original reward: {reward}")
-        #     print(f"New reward: {new_reward}")
-        #     print("done:", done)
-         
-        # if done or truncated:
-        #     print("=================")
-        #     print(f"Episode ended at step {self.i}")
-        #     print(f"Final Original reward: {reward}")
-        #     print(f"Final New reward: {new_reward}")
-        #     print("ft:", f_t)
-            
         self.prev_distance = current_distance  
         return obs, new_reward, done, truncated, info
 
@@ -147,9 +102,6 @@ class DrivingObsWrapper(gym.ObservationWrapper):
         obs_vec = extract_driving_obs(obs)
         return  obs_vec
         
-        #return {
-         #  "continuous": extract_driving_obs(obs).astype(np.float32)
-        #}
         
 
             
@@ -171,32 +123,6 @@ class ContinuousActionWrapper(gym.ActionWrapper):
             "nitro": 0,
             "rescue": 0,
         }
-
-class Actor(Agent):
-    """Computes probabilities over action"""
-
-    def forward(self, t: int):
-        # Computes probabilities over actions
-        raise NotImplementedError()
-
-
-class ArgmaxActor(Agent):
-    """Actor that computes the action"""
-
-    def forward(self, t: int):
-        # Selects the best actions according to the policy
-        raise NotImplementedError()
-
-
-class SamplingActor(Agent):
-    """Just sample random actions"""
-
-    def __init__(self, action_space: gym.Space):
-        super().__init__()
-        self.action_space = action_space
-
-    def forward(self, t: int):
-        self.set(("action", t), torch.LongTensor([self.action_space.sample()]))
 
 
 class SubmissionActor(Agent):

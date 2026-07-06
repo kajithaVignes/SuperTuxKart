@@ -1,0 +1,9 @@
+torch
+numpy
+gymnasium
+stable-baselines3
+shimmy
+# bbrl (can be installed via pip install bbrl)
+bbrl
+# pystk2-gymnasium (can be installed via pip install pystk2-gymnasium)
+pystk2-gymnasium
